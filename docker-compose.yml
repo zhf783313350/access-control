@@ -5,7 +5,7 @@ services:
     build: .
     container_name: access-control-api
     ports:
-      - "8080:8080"
+      - "8082:8082"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
