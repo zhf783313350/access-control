@@ -1,0 +1,29 @@
+Name: access-control-api
+Host: 0.0.0.0
+Port: 8080
+
+# 日志配置
+Log:
+  Mode: console
+  Level: info
+  Stat: true
+
+# 数据库配置 (PostgreSQL) - Docker 环境使用 host.docker.internal 连接宿主机
+Database:
+  Host: host.docker.internal
+  Port: 5432
+  User: postgres
+  Password: "123456"
+  DBName: access_control
+  SSLMode: disable
+
+# Redis配置
+Redis:
+  Host: host.docker.internal:6379
+  Password: ""
+  DB: 0
+
+# JWT配置
+Auth:
+  AccessSecret: "your-secret-key-change-in-production"
+  AccessExpire: 86400

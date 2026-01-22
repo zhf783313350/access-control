@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  access-control-api:
+    build: .
+    container_name: access-control-api
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always

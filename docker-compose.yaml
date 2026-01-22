@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  access-control:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: access-control-api
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=Asia/Shanghai
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - access-control-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: access-control-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=access_control
+      - TZ=Asia/Shanghai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/sql:/docker-entrypoint-initdb.d
+    networks:
+      - access-control-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: access-control-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - access-control-network
+    restart: unless-stopped
+
+networks:
+  access-control-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: access-control-pdb
+  namespace: access-control
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: access-control-api

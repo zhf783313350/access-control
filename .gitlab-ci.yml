@@ -1,0 +1,155 @@
+stages:
+  - test
+  - build
+  - docker
+  - deploy
+
+variables:
+  GO_VERSION: "1.21"
+  DOCKER_REGISTRY: registry.gitlab.com
+  DOCKER_IMAGE: $CI_REGISTRY_IMAGE
+  KUBERNETES_NAMESPACE: access-control
+
+# 缓存 Go 模块
+.go-cache: &go-cache
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .go/pkg/mod/
+
+# ===================
+# 测试阶段
+# ===================
+test:
+  stage: test
+  image: golang:${GO_VERSION}-alpine
+  <<: *go-cache
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.go
+  before_script:
+    - apk add --no-cache git
+    - go mod download
+  script:
+    - go vet ./...
+    - go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+  coverage: '/total:\s+\(statements\)\s+(\d+.\d+)%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.out
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_TAG
+
+lint:
+  stage: test
+  image: golangci/golangci-lint:latest
+  <<: *go-cache
+  script:
+    - golangci-lint run --timeout=5m
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+
+# ===================
+# 构建阶段
+# ===================
+build:
+  stage: build
+  image: golang:${GO_VERSION}-alpine
+  <<: *go-cache
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.go
+  before_script:
+    - apk add --no-cache git
+  script:
+    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s -X main.Version=${CI_COMMIT_TAG:-dev}" -o bin/access-control .
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_TAG
+
+# ===================
+# Docker 镜像构建
+# ===================
+docker:build:
+  stage: docker
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        TAG=$CI_COMMIT_TAG
+      else
+        TAG=$CI_COMMIT_SHORT_SHA
+      fi
+    - docker build -t $DOCKER_IMAGE:$TAG -t $DOCKER_IMAGE:latest .
+    - docker push $DOCKER_IMAGE:$TAG
+    - docker push $DOCKER_IMAGE:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_TAG
+
+# ===================
+# 部署阶段 - 开发环境
+# ===================
+deploy:dev:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: development
+    url: https://dev-api.access-control.example.com
+  before_script:
+    - echo "$KUBE_CONFIG_DEV" | base64 -d > /tmp/kubeconfig
+    - export KUBECONFIG=/tmp/kubeconfig
+  script:
+    - sed -i "s|image: access-control:latest|image: $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA|g" deploy/k8s/deployment.yaml
+    - kubectl apply -f deploy/k8s/namespace.yaml
+    - kubectl apply -f deploy/k8s/configmap.yaml
+    - kubectl apply -f deploy/k8s/deployment.yaml
+    - kubectl apply -f deploy/k8s/service.yaml
+    - kubectl apply -f deploy/k8s/ingress.yaml
+    - kubectl apply -f deploy/k8s/hpa.yaml
+    - kubectl rollout status deployment/access-control-api -n $KUBERNETES_NAMESPACE --timeout=300s
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+
+# ===================
+# 部署阶段 - 生产环境
+# ===================
+deploy:prod:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: production
+    url: https://api.access-control.example.com
+  before_script:
+    - echo "$KUBE_CONFIG_PROD" | base64 -d > /tmp/kubeconfig
+    - export KUBECONFIG=/tmp/kubeconfig
+  script:
+    - sed -i "s|image: access-control:latest|image: $DOCKER_IMAGE:$CI_COMMIT_TAG|g" deploy/k8s/deployment.yaml
+    - kubectl apply -f deploy/k8s/namespace.yaml
+    - kubectl apply -f deploy/k8s/configmap.yaml
+    - kubectl apply -f deploy/k8s/deployment.yaml
+    - kubectl apply -f deploy/k8s/service.yaml
+    - kubectl apply -f deploy/k8s/ingress.yaml
+    - kubectl apply -f deploy/k8s/hpa.yaml
+    - kubectl rollout status deployment/access-control-api -n $KUBERNETES_NAMESPACE --timeout=300s
+  rules:
+    - if: $CI_COMMIT_TAG
+  when: manual
