@@ -1,11 +1,58 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16
+    container_name: access-control-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "123456"
+      POSTGRES_DB: access_control
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - access-control-network
+
+  redis:
+    image: redis:7
+    container_name: access-control-redis
+    restart: always
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - access-control-network
+
   access-control-api:
     build: .
     container_name: access-control-api
     ports:
       - "8082:8082"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: always
+    networks:
+      - access-control-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+
+networks:
+  access-control-network:
+    driver: bridge
