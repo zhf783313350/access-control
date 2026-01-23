@@ -40,7 +40,7 @@ func (l *UserLogic) Login(req *types.LoginRequest) (*types.Response, error) {
 
 	// 从数据库查询用户
 	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, password, "phoneNumber", created_at, updated_at FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
+	err := l.svcCtx.DB.Get(&user, `SELECT id, password, "phoneNumber", "validTime", created_at, updated_at FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return &types.Response{
@@ -84,6 +84,7 @@ func (l *UserLogic) Login(req *types.LoginRequest) (*types.Response, error) {
 				PhoneNumber: user.PhoneNumber,
 				CreatedAt:   user.CreatedAt,
 				UpdatedAt:   user.UpdatedAt,
+				ValidTime:   user.ValidTime,
 			},
 		},
 	}, nil
