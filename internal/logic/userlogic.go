@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -40,7 +41,7 @@ func (l *UserLogic) Login(req *types.LoginRequest) (*types.Response, error) {
 
 	// 从数据库查询用户
 	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, password, "phoneNumber", "validTime", created_at, updated_at FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
+	err := l.svcCtx.DB.Get(&user, `SELECT id, password, "phoneNumber", status, "validTime", created_at, updated_at FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return &types.Response{
@@ -74,7 +75,7 @@ func (l *UserLogic) Login(req *types.LoginRequest) (*types.Response, error) {
 	fmt.Printf("user.Id user.PhoneNumber: %d , %s , now: %d accessExpire: %d\n", user.Id, user.PhoneNumber, now, accessExpire)
 
 	return &types.Response{
-		Code:    0,
+		Code:    http.StatusOK,
 		Message: "登录成功",
 		Data: types.LoginResponse{
 			AccessToken:  accessToken,
@@ -82,6 +83,7 @@ func (l *UserLogic) Login(req *types.LoginRequest) (*types.Response, error) {
 			UserInfo: model.User{
 				Id:          user.Id,
 				PhoneNumber: user.PhoneNumber,
+				Status:      user.Status,
 				CreatedAt:   user.CreatedAt,
 				UpdatedAt:   user.UpdatedAt,
 				ValidTime:   user.ValidTime,
