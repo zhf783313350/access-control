@@ -11,7 +11,7 @@ Log:
 # 数据库配置 (PostgreSQL)
 Database:
   Host: localhost
-  Port: 5432
+  Port: 15432
   User: postgres
   Password: "123456"
   DBName: access_control

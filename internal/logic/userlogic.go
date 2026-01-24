@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -35,7 +36,7 @@ func (l *UserLogic) QueryUser(req *types.LoginRequest) (*types.Response, error) 
 
 	// 从数据库查询用户
 	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber", status, "validTime" FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
+	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return &types.Response{
@@ -67,7 +68,7 @@ func (l *UserLogic) AddUser(req *model.User) (*types.Response, error) {
 	}
 	// 检查用户是否已存在
 	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber", status, "validTime" FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
+	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
 	if err == nil {
 		return &types.Response{
 			Code:    409,
@@ -103,7 +104,7 @@ func (l *UserLogic) EditUser(req *model.User) (*types.Response, error) {
 	}
 	// 检查用户是否存在
 	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber", status, "validTime" FROM users WHERE id = $1`, req.Id)
+	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users WHERE id = $1`, req.Id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return &types.Response{
@@ -167,20 +168,25 @@ func (l *UserLogic) ListUsers(page, pageSize int) (*types.Response, error) {
 		logx.Errorf("查询用户总数失败: %v", err)
 		return &types.Response{
 			Code:    500,
-			Message: "系统错误",
+			Message: "系统错误: " + err.Error(),
 		}, nil
 	}
+	logx.Infof("[DEBUG] ListUsers - 查询到的总数: %d", total)
 
 	// 分页查询用户列表
 	var users []model.User
-	err = l.svcCtx.DB.Select(&users, `SELECT id, "phoneNumber", status, "validTime" FROM users ORDER BY id LIMIT $1 OFFSET $2`, pageSize, (page-1)*pageSize)
+	query := `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users ORDER BY id LIMIT $1 OFFSET $2`
+	logx.Infof("[DEBUG] SQL: %s, params: pageSize=%d, offset=%d", query, pageSize, (page-1)*pageSize)
+
+	err = l.svcCtx.DB.Select(&users, query, pageSize, (page-1)*pageSize)
 	if err != nil {
 		logx.Errorf("查询用户失败: %v", err)
 		return &types.Response{
 			Code:    500,
-			Message: "系统错误",
+			Message: "系统错误: " + err.Error(),
 		}, nil
 	}
+	logx.Infof("[DEBUG] ListUsers - 查询到的用户数量: %d (page=%d, pageSize=%d)", len(users), page, pageSize)
 
 	return &types.Response{
 		Code:    http.StatusOK,

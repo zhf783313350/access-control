@@ -2,16 +2,17 @@
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     "phoneNumber" VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
     status INTEGER DEFAULT 1,
-    "validTime" VARCHAR(50),
-    created_at VARCHAR(50),
-    updated_at VARCHAR(50)
+    "validTime" VARCHAR(50)
 );
 
--- 插入默认管理员用户
-INSERT INTO users ("phoneNumber", password, status, "validTime", created_at, updated_at) 
-VALUES ('admin', 'admin123', 1, '2099-12-31 23:59:59', '2026-01-22 00:00:00', '2026-01-22 00:00:00')
+-- 插入测试数据
+INSERT INTO users ("phoneNumber", status, "validTime") VALUES
+('13800000001', 1, '2026-12-31 23:59:59'),
+('13800000002', 1, '2026-12-31 23:59:59'),
+('13800000003', 1, '2026-12-31 23:59:59'),
+('13800000004', 1, '2026-12-31 23:59:59'),
+('13800000005', 1, '2026-12-31 23:59:59')
 ON CONFLICT ("phoneNumber") DO NOTHING;
 
 -- 创建索引

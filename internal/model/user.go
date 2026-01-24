@@ -3,7 +3,7 @@ package model
 // User 用户表模型
 type User struct {
 	Id          int64  `db:"id" json:"id"`
-	PhoneNumber string `db:"phoneNumber" json:"phoneNumber"`
+	PhoneNumber string `db:"phonenumber" json:"phoneNumber"`
 	Status      int    `db:"status" json:"status"`
-	ValidTime   string `db:"validTime" json:"validTime"`
+	ValidTime   string `db:"validtime" json:"validTime"`
 }
