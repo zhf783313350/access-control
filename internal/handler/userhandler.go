@@ -2,10 +2,10 @@ package handler
 
 import (
 	"accesscontrol/internal/logic"
-	"accesscontrol/internal/model"
 	"accesscontrol/internal/svc"
 	"accesscontrol/internal/types"
 	"net/http"
+
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -30,7 +30,7 @@ func QueryUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 // AddUserHandler 添加用户
 func AddUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req model.User
+		var req types.RegisterRequest
 		if err := httpx.Parse(r, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
@@ -49,7 +49,7 @@ func AddUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 // EditUserHandler 编辑用户
 func EditUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req model.User
+		var req types.UpdateUserRequest
 		if err := httpx.Parse(r, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return

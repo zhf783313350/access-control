@@ -21,6 +21,21 @@ type LoginResponse struct {
 	UserInfo     model.User `json:"userInfo"`
 }
 
+// 注册/创建用户请求
+type RegisterRequest struct {
+	PhoneNumber string `json:"phoneNumber"`
+	ValidTime   string `json:"validTime"`
+	Status      int    `json:"status"`
+}
+
+// 更新用户请求
+type UpdateUserRequest struct {
+	Id          int64  `json:"id"`
+	PhoneNumber string `json:"phoneNumber"`
+	Status      int    `json:"status"`
+	ValidTime   string `json:"validTime"`
+}
+
 // 删除用户请求
 type DeleteUserRequest struct {
 	PhoneNumber string `json:"phoneNumber"`

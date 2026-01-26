@@ -6,6 +6,7 @@ import (
 	"accesscontrol/internal/types"
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -28,27 +29,17 @@ func NewUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UserLogic {
 func (l *UserLogic) QueryUser(req *types.LoginRequest) (*types.Response, error) {
 	// 验证参数
 	if req.PhoneNumber == "" {
-		return &types.Response{
-			Code:    400,
-			Message: "手机号不能为空",
-		}, nil
+		return nil, errors.New("手机号不能为空")
 	}
 
 	// 从数据库查询用户
-	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
+	user, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return &types.Response{
-				Code:    401,
-				Message: "用户不存在",
-			}, nil
+		if err == sql.ErrNoRows || err.Error() == "sql: no rows in result set" {
+			return nil, errors.New("用户不存在")
 		}
 		logx.Errorf("查询用户失败: %v", err)
-		return &types.Response{
-			Code:    500,
-			Message: "系统错误",
-		}, nil
+		return nil, err
 	}
 
 	return &types.Response{
@@ -58,33 +49,27 @@ func (l *UserLogic) QueryUser(req *types.LoginRequest) (*types.Response, error) 
 	}, nil
 }
 
-func (l *UserLogic) AddUser(req *model.User) (*types.Response, error) {
+func (l *UserLogic) AddUser(req *types.RegisterRequest) (*types.Response, error) {
 	// 添加用户
 	if req.PhoneNumber == "" || req.ValidTime == "" {
-		return &types.Response{
-			Code:    400,
-			Message: "手机号或有效时间不能为空",
-		}, nil
+		return nil, errors.New("手机号或有效时间不能为空")
 	}
 	// 检查用户是否已存在
-	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users WHERE "phoneNumber" = $1`, req.PhoneNumber)
+	_, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
 	if err == nil {
-		return &types.Response{
-			Code:    409,
-			Message: "用户已存在",
-		}, nil
+		return nil, errors.New("用户已存在")
 	}
 
 	// 添加新用户
-	_, err = l.svcCtx.DB.Exec(`INSERT INTO users ("phoneNumber", status, "validTime") VALUES ($1, $2, $3)`,
-		req.PhoneNumber, 1, req.ValidTime)
+	user := &model.User{
+		PhoneNumber: req.PhoneNumber,
+		Status:      req.Status,
+		ValidTime:   req.ValidTime,
+	}
+	err = l.svcCtx.UserRepo.Insert(l.ctx, user)
 	if err != nil {
 		logx.Errorf("添加用户失败: %v", err)
-		return &types.Response{
-			Code:    500,
-			Message: "系统错误",
-		}, nil
+		return nil, err
 	}
 
 	return &types.Response{
@@ -94,40 +79,26 @@ func (l *UserLogic) AddUser(req *model.User) (*types.Response, error) {
 }
 
 // 编辑用户
-func (l *UserLogic) EditUser(req *model.User) (*types.Response, error) {
+func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, error) {
 	// 编辑用户
 	if req.Id == 0 || req.PhoneNumber == "" || req.ValidTime == "" {
-		return &types.Response{
-			Code:    400,
-			Message: "用户ID、手机号或有效时间不能为空",
-		}, nil
+		return nil, errors.New("用户ID、手机号或有效时间不能为空")
 	}
 	// 检查用户是否存在
-	var user model.User
-	err := l.svcCtx.DB.Get(&user, `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users WHERE id = $1`, req.Id)
+	user, err := l.svcCtx.UserRepo.FindOne(l.ctx, req.Id)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return &types.Response{
-				Code:    404,
-				Message: "用户不存在",
-			}, nil
-		}
-		logx.Errorf("查询用户失败: %v", err)
-		return &types.Response{
-			Code:    500,
-			Message: "系统错误",
-		}, nil
+		return nil, errors.New("用户不存在")
 	}
 
 	// 更新用户信息
-	_, err = l.svcCtx.DB.Exec(`UPDATE users SET "phoneNumber" = $1, status = $2, "validTime" = $3 WHERE id = $4`,
-		req.PhoneNumber, req.Status, req.ValidTime, req.Id)
+	user.PhoneNumber = req.PhoneNumber
+	user.Status = req.Status
+	user.ValidTime = req.ValidTime
+
+	err = l.svcCtx.UserRepo.Update(l.ctx, user)
 	if err != nil {
 		logx.Errorf("更新用户失败: %v", err)
-		return &types.Response{
-			Code:    500,
-			Message: "系统错误",
-		}, nil
+		return nil, err
 	}
 
 	return &types.Response{
@@ -140,18 +111,12 @@ func (l *UserLogic) EditUser(req *model.User) (*types.Response, error) {
 func (l *UserLogic) DeleteUser(phoneNumber string) (*types.Response, error) {
 	// 删除用户
 	if phoneNumber == "" {
-		return &types.Response{
-			Code:    400,
-			Message: "手机号不能为空",
-		}, nil
+		return nil, errors.New("手机号不能为空")
 	}
-	_, err := l.svcCtx.DB.Exec(`DELETE FROM users WHERE "phoneNumber" = $1`, phoneNumber)
+	err := l.svcCtx.UserRepo.Delete(l.ctx, phoneNumber)
 	if err != nil {
 		logx.Errorf("删除用户失败: %v", err)
-		return &types.Response{
-			Code:    500,
-			Message: "系统错误",
-		}, nil
+		return nil, err
 	}
 	return &types.Response{
 		Code:    http.StatusOK,
@@ -161,32 +126,12 @@ func (l *UserLogic) DeleteUser(phoneNumber string) (*types.Response, error) {
 
 // 用户列表 分页加载
 func (l *UserLogic) ListUsers(page, pageSize int) (*types.Response, error) {
-	// 查询总数
-	var total int
-	err := l.svcCtx.DB.Get(&total, `SELECT COUNT(*) FROM users`)
-	if err != nil {
-		logx.Errorf("查询用户总数失败: %v", err)
-		return &types.Response{
-			Code:    500,
-			Message: "系统错误: " + err.Error(),
-		}, nil
-	}
-	logx.Infof("[DEBUG] ListUsers - 查询到的总数: %d", total)
-
-	// 分页查询用户列表
-	var users []model.User
-	query := `SELECT id, "phoneNumber" AS phonenumber, status, "validTime" AS validtime FROM users ORDER BY id LIMIT $1 OFFSET $2`
-	logx.Infof("[DEBUG] SQL: %s, params: pageSize=%d, offset=%d", query, pageSize, (page-1)*pageSize)
-
-	err = l.svcCtx.DB.Select(&users, query, pageSize, (page-1)*pageSize)
+	// 使用 Repository 进行分页查询
+	users, total, err := l.svcCtx.UserRepo.List(l.ctx, pageSize, (page-1)*pageSize)
 	if err != nil {
 		logx.Errorf("查询用户失败: %v", err)
-		return &types.Response{
-			Code:    500,
-			Message: "系统错误: " + err.Error(),
-		}, nil
+		return nil, err
 	}
-	logx.Infof("[DEBUG] ListUsers - 查询到的用户数量: %d (page=%d, pageSize=%d)", len(users), page, pageSize)
 
 	return &types.Response{
 		Code:    http.StatusOK,
