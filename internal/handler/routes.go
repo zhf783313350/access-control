@@ -16,29 +16,30 @@ func SetupRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 		[]rest.Route{
 			{
 				Method:  http.MethodPost,
-				Path:    "/api/query",
+				Path:    "/user/query",
 				Handler: rateLimitMatch(QueryUserHandler(serverCtx)),
 			},
 			{
 				Method:  http.MethodPost,
-				Path:    "/api/add",
+				Path:    "/user/add",
 				Handler: rateLimitMatch(AddUserHandler(serverCtx)),
 			},
 			{
 				Method:  http.MethodPost,
-				Path:    "/api/edit",
+				Path:    "/user/edit",
 				Handler: rateLimitMatch(EditUserHandler(serverCtx)),
 			},
 			{
 				Method:  http.MethodPost,
-				Path:    "/api/delete",
+				Path:    "/user/delete",
 				Handler: rateLimitMatch(DeleteUserHandler(serverCtx)),
 			},
 			{
 				Method:  http.MethodPost,
-				Path:    "/api/list",
+				Path:    "/user/list",
 				Handler: rateLimitMatch(ListUsersHandler(serverCtx)),
 			},
 		},
+		rest.WithPrefix("/v1/api"),
 	)
 }

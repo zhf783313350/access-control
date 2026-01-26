@@ -6,6 +6,7 @@ import (
 	"accesscontrol/internal/types"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -32,14 +33,34 @@ func (l *UserLogic) QueryUser(req *types.LoginRequest) (*types.Response, error) 
 		return nil, errors.New("手机号不能为空")
 	}
 
-	// 从数据库查询用户
-	user, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
+	// 1. 尝试从 Redis 获取缓存
+	cacheKey := "user:phone:" + req.PhoneNumber
+	var user model.User
+	cacheVal, _ := l.svcCtx.Redis.Get(cacheKey)
+	if cacheVal != "" {
+		if err := json.Unmarshal([]byte(cacheVal), &user); err == nil {
+			return &types.Response{
+				Code:    http.StatusOK,
+				Message: "查询成功（来自缓存）",
+				Data:    user,
+			}, nil
+		}
+	}
+
+	// 2. 缓存未命中，从数据库查询用户
+	u, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
 	if err != nil {
 		if err == sql.ErrNoRows || err.Error() == "sql: no rows in result set" {
 			return nil, errors.New("用户不存在")
 		}
 		logx.Errorf("查询用户失败: %v", err)
 		return nil, err
+	}
+	user = *u
+
+	// 3. 写入 Redis 缓存 (设置 10 分钟过期时间)
+	if data, err := json.Marshal(user); err == nil {
+		_ = l.svcCtx.Redis.Setex(cacheKey, string(data), 600)
 	}
 
 	return &types.Response{
@@ -101,6 +122,10 @@ func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, err
 		return nil, err
 	}
 
+	// 3. 清除 Redis 缓存 (保证下次查询能拿到新数据)
+	cacheKey := "user:phone:" + user.PhoneNumber
+	_, _ = l.svcCtx.Redis.Del(cacheKey)
+
 	return &types.Response{
 		Code:    http.StatusOK,
 		Message: "用户信息更新成功",
@@ -113,11 +138,17 @@ func (l *UserLogic) DeleteUser(phoneNumber string) (*types.Response, error) {
 	if phoneNumber == "" {
 		return nil, errors.New("手机号不能为空")
 	}
+
 	err := l.svcCtx.UserRepo.Delete(l.ctx, phoneNumber)
 	if err != nil {
 		logx.Errorf("删除用户失败: %v", err)
 		return nil, err
 	}
+
+	// 清除 Redis 缓存
+	cacheKey := "user:phone:" + phoneNumber
+	_, _ = l.svcCtx.Redis.Del(cacheKey)
+
 	return &types.Response{
 		Code:    http.StatusOK,
 		Message: "用户删除成功",
