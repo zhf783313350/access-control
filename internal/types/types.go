@@ -23,17 +23,25 @@ type LoginResponse struct {
 
 // 注册/创建用户请求
 type RegisterRequest struct {
-	PhoneNumber string `json:"phoneNumber"`
-	ValidTime   string `json:"validTime"`
-	Status      int    `json:"status"`
+	PhoneNumber    string `json:"phoneNumber"`
+	ValidTime      string `json:"validTime"`
+	Status         int    `json:"status"`
+	Organization   string `json:"organization"`
+	Client         string `json:"client"`
+	OrganizationID string `json:"organizationId"`
+	ClientID       string `json:"clientId"`
 }
 
 // 更新用户请求
 type UpdateUserRequest struct {
-	Id          int64  `json:"id"`
-	PhoneNumber string `json:"phoneNumber"`
-	Status      int    `json:"status"`
-	ValidTime   string `json:"validTime"`
+	Id             int64  `json:"id"`
+	PhoneNumber    string `json:"phoneNumber"`
+	Status         int    `json:"status"`
+	ValidTime      string `json:"validTime"`
+	Organization   string `json:"organization"`
+	Client         string `json:"client"`
+	OrganizationID string `json:"organizationId"`
+	ClientID       string `json:"clientId"`
 }
 
 // 删除用户请求

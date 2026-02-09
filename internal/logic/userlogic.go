@@ -83,9 +83,13 @@ func (l *UserLogic) AddUser(req *types.RegisterRequest) (*types.Response, error)
 
 	// 添加新用户
 	user := &model.User{
-		PhoneNumber: req.PhoneNumber,
-		Status:      req.Status,
-		ValidTime:   req.ValidTime,
+		PhoneNumber:    req.PhoneNumber,
+		Status:         req.Status,
+		ValidTime:      req.ValidTime,
+		Organization:   req.Organization,
+		Client:         req.Client,
+		OrganizationID: req.OrganizationID,
+		ClientID:       req.ClientID,
 	}
 	err = l.svcCtx.UserRepo.Insert(l.ctx, user)
 	if err != nil {
@@ -115,6 +119,10 @@ func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, err
 	user.PhoneNumber = req.PhoneNumber
 	user.Status = req.Status
 	user.ValidTime = req.ValidTime
+	user.Organization = req.Organization
+	user.Client = req.Client
+	user.OrganizationID = req.OrganizationID
+	user.ClientID = req.ClientID
 
 	err = l.svcCtx.UserRepo.Update(l.ctx, user)
 	if err != nil {
