@@ -9,7 +9,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -89,13 +88,9 @@ func (l *UserLogic) AddUser(req *types.RegisterRequest) (*types.Response, error)
 	}
 
 	user := &model.User{
-		PhoneNumber:    req.PhoneNumber,
-		Status:         req.Status,
-		ValidTime:      req.ValidTime,
-		Organization:   req.Organization,
-		Client:         req.Client,
-		OrganizationID: req.OrganizationID,
-		ClientID:       req.ClientID,
+		PhoneNumber: req.PhoneNumber,
+		Status:      req.Status,
+		ValidTime:   req.ValidTime,
 	}
 	err = l.svcCtx.UserRepo.Insert(l.ctx, user)
 	if err != nil {
@@ -124,10 +119,6 @@ func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, err
 	user.PhoneNumber = req.PhoneNumber
 	user.Status = req.Status
 	user.ValidTime = req.ValidTime
-	user.Organization = req.Organization
-	user.Client = req.Client
-	user.OrganizationID = req.OrganizationID
-	user.ClientID = req.ClientID
 
 	err = l.svcCtx.UserRepo.Update(l.ctx, user)
 	if err != nil {

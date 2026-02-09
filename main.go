@@ -9,14 +9,11 @@ import (
 	"accesscontrol/internal/handler"
 	"accesscontrol/internal/svc"
 	"net/http"
-
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
-
 var configFile = flag.String("f", "etc/config.yaml", "the config file")
-
 func main() {
 	flag.Parse()
 
@@ -35,7 +32,6 @@ func main() {
 			return http.StatusInternalServerError, nil
 		}
 	})
-
 	ctx := svc.NewServiceContext(c)
 	handler.SetupRoutes(server, ctx)
 

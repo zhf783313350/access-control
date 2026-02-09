@@ -3,11 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     "phoneNumber" VARCHAR(50) UNIQUE NOT NULL,
     status INTEGER DEFAULT 1,
-    "validTime" VARCHAR(50),
-    organization VARCHAR(100),
-    client VARCHAR(100),
-    organization_id VARCHAR(100),
-    client_id VARCHAR(100)
+    "validTime" VARCHAR(50)
 );
 
 -- 插入测试数据
