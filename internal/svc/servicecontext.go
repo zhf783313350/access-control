@@ -10,6 +10,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/zeromicro/go-zero/core/limit"
 	"github.com/zeromicro/go-zero/core/stores/redis"
+	"github.com/zeromicro/go-zero/core/syncx"
 )
 
 type ServiceContext struct {
@@ -18,6 +19,7 @@ type ServiceContext struct {
 	UserRepo    repository.UserRepository
 	Redis       *redis.Redis
 	RateLimiter *limit.TokenLimiter
+	SingleGroup syncx.SingleFlight
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -56,5 +58,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		UserRepo:    repository.NewUserRepository(db),
 		Redis:       rds,
 		RateLimiter: limiter,
+		SingleGroup: syncx.NewSingleFlight(),
 	}
 }

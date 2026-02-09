@@ -1,13 +1,13 @@
 package logic
 
 import (
+	"accesscontrol/internal/errorx"
 	"accesscontrol/internal/model"
 	"accesscontrol/internal/svc"
 	"accesscontrol/internal/types"
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -28,60 +28,66 @@ func NewUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UserLogic {
 }
 
 func (l *UserLogic) QueryUser(req *types.LoginRequest) (*types.Response, error) {
-	// 验证参数
 	if req.PhoneNumber == "" {
-		return nil, errors.New("手机号不能为空")
+		return nil, errorx.NewCodeError(errorx.ErrCodeParamInvalid, "手机号不能为空")
 	}
 
-	// 1. 尝试从 Redis 获取缓存
 	cacheKey := "user:phone:" + req.PhoneNumber
-	var user model.User
-	cacheVal, _ := l.svcCtx.Redis.Get(cacheKey)
-	if cacheVal != "" {
-		if err := json.Unmarshal([]byte(cacheVal), &user); err == nil {
-			return &types.Response{
-				Code:    http.StatusOK,
-				Message: "查询成功（来自缓存）",
-				Data:    user,
-			}, nil
-		}
-	}
 
-	// 2. 缓存未命中，从数据库查询用户
-	u, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
+	// 1. SingleFlight + Cache protection
+	val, err := l.svcCtx.SingleGroup.Do(cacheKey, func() (interface{}, error) {
+		// 1.1 尝试从异步获取缓存 (再次检查，防止并发穿透)
+		var user model.User
+		cacheVal, _ := l.svcCtx.Redis.Get(cacheKey)
+		if cacheVal != "" {
+			if cacheVal == "empty" {
+				return nil, errorx.NewCodeError(errorx.ErrCodeUserNotFound, "用户不存在(缓存穿透保护)")
+			}
+			if err := json.Unmarshal([]byte(cacheVal), &user); err == nil {
+				return &user, nil
+			}
+		}
+
+		// 1.2 缓存未命中，从数据库查询
+		u, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
+		if err != nil {
+			if err == sql.ErrNoRows || err.Error() == "sql: no rows in result set" {
+				// 写入空缓存，防止缓存穿透 (过期时间设置短一点，如 60s)
+				_ = l.svcCtx.Redis.Setex(cacheKey, "empty", 60)
+				return nil, errorx.NewCodeError(errorx.ErrCodeUserNotFound, "用户不存在")
+			}
+			return nil, errorx.NewCodeError(errorx.ErrCodeServerInternal, "数据库查询失败")
+		}
+
+		// 1.3 写入正常缓存 (10分钟)
+		if data, err := json.Marshal(u); err == nil {
+			_ = l.svcCtx.Redis.Setex(cacheKey, string(data), 600)
+		}
+		return u, nil
+	})
+
 	if err != nil {
-		if err == sql.ErrNoRows || err.Error() == "sql: no rows in result set" {
-			return nil, errors.New("用户不存在")
-		}
-		logx.Errorf("查询用户失败: %v", err)
 		return nil, err
-	}
-	user = *u
-
-	// 3. 写入 Redis 缓存 (设置 10 分钟过期时间)
-	if data, err := json.Marshal(user); err == nil {
-		_ = l.svcCtx.Redis.Setex(cacheKey, string(data), 600)
 	}
 
 	return &types.Response{
 		Code:    http.StatusOK,
 		Message: "查询成功",
-		Data:    user,
+		Data:    val,
 	}, nil
 }
 
 func (l *UserLogic) AddUser(req *types.RegisterRequest) (*types.Response, error) {
-	// 添加用户
 	if req.PhoneNumber == "" || req.ValidTime == "" {
-		return nil, errors.New("手机号或有效时间不能为空")
+		return nil, errorx.NewCodeError(errorx.ErrCodeParamInvalid, "手机号或有效时间不能为空")
 	}
+
 	// 检查用户是否已存在
 	_, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
 	if err == nil {
-		return nil, errors.New("用户已存在")
+		return nil, errorx.NewCodeError(errorx.ErrCodeUserAlreadyExist, "用户已存在")
 	}
 
-	// 添加新用户
 	user := &model.User{
 		PhoneNumber:    req.PhoneNumber,
 		Status:         req.Status,
@@ -94,7 +100,7 @@ func (l *UserLogic) AddUser(req *types.RegisterRequest) (*types.Response, error)
 	err = l.svcCtx.UserRepo.Insert(l.ctx, user)
 	if err != nil {
 		logx.Errorf("添加用户失败: %v", err)
-		return nil, err
+		return nil, errorx.NewCodeError(errorx.ErrCodeServerInternal, "添加用户失败")
 	}
 
 	return &types.Response{
@@ -105,14 +111,13 @@ func (l *UserLogic) AddUser(req *types.RegisterRequest) (*types.Response, error)
 
 // 编辑用户
 func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, error) {
-	// 编辑用户
 	if req.Id == 0 || req.PhoneNumber == "" || req.ValidTime == "" {
-		return nil, errors.New("用户ID、手机号或有效时间不能为空")
+		return nil, errorx.NewCodeError(errorx.ErrCodeParamInvalid, "用户ID、手机号或有效时间不能为空")
 	}
 	// 检查用户是否存在
 	user, err := l.svcCtx.UserRepo.FindOne(l.ctx, req.Id)
 	if err != nil {
-		return nil, errors.New("用户不存在")
+		return nil, errorx.NewCodeError(errorx.ErrCodeUserNotFound, "用户不存在")
 	}
 
 	// 更新用户信息
@@ -127,10 +132,10 @@ func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, err
 	err = l.svcCtx.UserRepo.Update(l.ctx, user)
 	if err != nil {
 		logx.Errorf("更新用户失败: %v", err)
-		return nil, err
+		return nil, errorx.NewCodeError(errorx.ErrCodeServerInternal, "更新用户失败")
 	}
 
-	// 3. 清除 Redis 缓存 (保证下次查询能拿到新数据)
+	// 3. 清除 Redis 缓存
 	cacheKey := "user:phone:" + user.PhoneNumber
 	_, _ = l.svcCtx.Redis.Del(cacheKey)
 
@@ -142,15 +147,14 @@ func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, err
 
 // 删除用户 根据手机号码
 func (l *UserLogic) DeleteUser(phoneNumber string) (*types.Response, error) {
-	// 删除用户
 	if phoneNumber == "" {
-		return nil, errors.New("手机号不能为空")
+		return nil, errorx.NewCodeError(errorx.ErrCodeParamInvalid, "手机号不能为空")
 	}
 
 	err := l.svcCtx.UserRepo.Delete(l.ctx, phoneNumber)
 	if err != nil {
 		logx.Errorf("删除用户失败: %v", err)
-		return nil, err
+		return nil, errorx.NewCodeError(errorx.ErrCodeServerInternal, "删除用户失败")
 	}
 
 	// 清除 Redis 缓存
@@ -165,11 +169,10 @@ func (l *UserLogic) DeleteUser(phoneNumber string) (*types.Response, error) {
 
 // 用户列表 分页加载
 func (l *UserLogic) ListUsers(page, pageSize int) (*types.Response, error) {
-	// 使用 Repository 进行分页查询
 	users, total, err := l.svcCtx.UserRepo.List(l.ctx, pageSize, (page-1)*pageSize)
 	if err != nil {
 		logx.Errorf("查询用户失败: %v", err)
-		return nil, err
+		return nil, errorx.NewCodeError(errorx.ErrCodeServerInternal, "查询用户列表失败")
 	}
 
 	return &types.Response{
