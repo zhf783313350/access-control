@@ -1,6 +1,6 @@
 module accesscontrol
 
-go 1.25.1
+go 1.26.0
 
 require github.com/zeromicro/go-zero v1.9.4
 
