@@ -16,13 +16,10 @@ import (
 var configFile = flag.String("f", "etc/config.yaml", "the config file")
 func main() {
 	flag.Parse()
-
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
-
 	server := rest.MustNewServer(c.RestConf)
 	defer server.Stop()
-
 	// 自定义错误处理
 	httpx.SetErrorHandler(func(err error) (int, interface{}) {
 		switch e := err.(type) {
@@ -33,8 +30,6 @@ func main() {
 		}
 	})
 	ctx := svc.NewServiceContext(c)
-	handler.SetupRoutes(server, ctx)
-
-	fmt.Printf("Starting server at %s:%d...\n", c.Host, c.Port)
+	handler.SetupRoutes(server, ctx) 
 	server.Start()
 }
