@@ -1,9 +1,7 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-
+	"flag" 
 	"accesscontrol/internal/config"
 	"accesscontrol/internal/errorx"
 	"accesscontrol/internal/handler"
