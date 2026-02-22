@@ -30,7 +30,6 @@ type RegisterRequest struct {
 
 // 更新用户请求
 type UpdateUserRequest struct {
-	Id          int64  `json:"id"`
 	PhoneNumber string `json:"phoneNumber"`
 	Status      int    `json:"status"`
 	ValidTime   string `json:"validTime"`

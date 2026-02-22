@@ -5,7 +5,6 @@ import (
 	"accesscontrol/internal/svc"
 	"accesscontrol/internal/types"
 	"net/http"
-
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -73,7 +72,6 @@ func DeleteUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
-
 		l := logic.NewUserLogic(r.Context(), svcCtx)
 		resp, err := l.DeleteUser(req.PhoneNumber)
 		if err != nil {
@@ -92,7 +90,6 @@ func ListUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
-
 		// 默认值处理
 		if req.Page <= 0 {
 			req.Page = 1
@@ -100,7 +97,6 @@ func ListUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		if req.PageSize <= 0 {
 			req.PageSize = 10
 		}
-
 		l := logic.NewUserLogic(r.Context(), svcCtx)
 		resp, err := l.ListUsers(req.Page, req.PageSize)
 		if err != nil {

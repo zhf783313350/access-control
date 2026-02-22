@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -106,20 +107,17 @@ func (l *UserLogic) AddUser(req *types.RegisterRequest) (*types.Response, error)
 
 // 编辑用户
 func (l *UserLogic) EditUser(req *types.UpdateUserRequest) (*types.Response, error) {
-	if req.Id == 0 || req.PhoneNumber == "" || req.ValidTime == "" {
-		return nil, errorx.NewCodeError(errorx.ErrCodeParamInvalid, "用户ID、手机号或有效时间不能为空")
+	if req.PhoneNumber == "" || req.ValidTime == "" {
+		return nil, errorx.NewCodeError(errorx.ErrCodeParamInvalid, "手机号或有效时间不能为空")
 	}
-	// 检查用户是否存在
-	user, err := l.svcCtx.UserRepo.FindOne(l.ctx, req.Id)
+	// 检查用户是否存在 (根据手机号)
+	user, err := l.svcCtx.UserRepo.FindOneByPhone(l.ctx, req.PhoneNumber)
 	if err != nil {
 		return nil, errorx.NewCodeError(errorx.ErrCodeUserNotFound, "用户不存在")
 	}
-
 	// 更新用户信息
-	user.PhoneNumber = req.PhoneNumber
 	user.Status = req.Status
 	user.ValidTime = req.ValidTime
-
 	err = l.svcCtx.UserRepo.Update(l.ctx, user)
 	if err != nil {
 		logx.Errorf("更新用户失败: %v", err)
