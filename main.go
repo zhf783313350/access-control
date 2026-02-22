@@ -17,8 +17,7 @@ func main() {
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
 	server := rest.MustNewServer(c.RestConf)
-	defer server.Stop()
-	// 自定义错误处理
+	defer server.Stop() 
 	httpx.SetErrorHandler(func(err error) (int, interface{}) {
 		switch e := err.(type) {
 		case *errorx.CodeError:
